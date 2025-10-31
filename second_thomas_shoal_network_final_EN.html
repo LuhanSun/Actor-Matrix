@@ -1,0 +1,415 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Second Thomas Shoal — Actor Network (Final EN, Flag Nodes)</title>
+<style>
+  :root {
+    --bg: #0b1020;
+    --text: #e9eef7;
+    --muted: #cbd3e7;
+    --red: #ff5a5f;
+    --blue: #42a5f5;
+    --green: #66bb6a;
+    --grey: #9aa4b2;
+  }
+  html, body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+  }
+  .wrap { width: 100%; height: 100vh; display: grid; grid-template-rows: auto 1fr; }
+  header { padding: 14px 18px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  header p { margin: 0; font-size: 12px; color: var(--muted); }
+  .board { position: relative; height: calc(100vh - 64px); }
+  svg { width: 100%; height: 100%; }
+  .node { cursor: grab; }
+  .node:active { cursor: grabbing; }
+  .label {
+    font-size: 13px; fill: #f4f7ff; paint-order: stroke;
+    stroke: rgba(11,16,32,0.6); stroke-width: 3px; font-weight: 700;
+  }
+  .legend {
+    position: absolute; right: 14px; top: 14px; display: grid; gap: 10px;
+    padding: 12px 14px; border-radius: 14px;
+    background: rgba(10, 16, 36, 0.72); backdrop-filter: blur(6px);
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+  .legend h3 { margin: 0 0 6px; font-size: 12px; color: var(--muted); letter-spacing: 0.3px; text-transform: uppercase; }
+  .legend .row { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #e9eef7; }
+  .legend .dot { width: 12px; height: 12px; border-radius: 999px; }
+  .legend .line { width: 20px; height: 4px; border-radius: 3px; }
+  /* Tooltip — much larger and structured keywords */
+  .tip {
+    position: absolute; pointer-events: none; background: rgba(18, 25, 51, 0.98);
+    border: 1px solid rgba(255,255,255,0.08); padding: 20px 22px; border-radius: 16px;
+    box-shadow: 0 14px 30px rgba(0,0,0,0.35); max-width: 760px; color: var(--text);
+    display: none; z-index: 10;
+  }
+  .tip h4 { margin: 0 0 12px; font-size: 24px; font-weight: 800; letter-spacing: 0.2px; }
+  .meta { display: grid; gap: 12px; font-size: 18px; line-height: 1.6; color: var(--muted); }
+  .meta b { color: #e9eef7; font-weight: 800; }
+  .bul { margin: 0 0 2px 0; padding-left: 1.1em; text-indent: -1.1em; }
+  .bul::before { content: "• "; }
+  .glow-red { filter: drop-shadow(0 0 16px rgba(255,90,95,0.5)); }
+  .glow-blue { filter: drop-shadow(0 0 16px rgba(66,165,245,0.5)); }
+  .glow-green { filter: drop-shadow(0 0 16px rgba(102,187,106,0.5)); }
+  .flagCard { rx: 12; ry: 12; stroke: rgba(255,255,255,0.85); stroke-width: 1.2; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Second Thomas Shoal — Actor Matrix (Interactive)</h1>
+    <p>Node size = influence • Node color = category • Link color = relationship • Drag to explore • Hover for details</p>
+  </header>
+  <div class="board">
+    <svg id="viz" viewBox="0 0 1280 720" preserveAspectRatio="xMidYMid meet"></svg>
+
+    <div class="legend">
+      <div>
+        <h3>Actor Types</h3>
+        <div class="row"><span class="dot" style="background: var(--red)"></span> Primary disputants (China, Philippines)</div>
+        <div class="row"><span class="dot" style="background: var(--blue)"></span> Key third parties (U.S., Japan, Australia)</div>
+        <div class="row"><span class="dot" style="background: var(--green)"></span> Multilateral (ASEAN)</div>
+      </div>
+      <div>
+        <h3>Relationship Types</h3>
+        <div class="row"><span class="line" style="background: var(--red)"></span> Tense / coercive</div>
+        <div class="row"><span class="line" style="background: var(--blue)"></span> Supportive / alliance</div>
+        <div class="row"><span class="line" style="background: var(--grey)"></span> Neutral / complex</div>
+      </div>
+    </div>
+
+    <div class="tip" id="tip"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script>
+// ==== Nodes (strictly from user's script) ====
+const nodes = [
+  { id: "Philippines", group: "disputant", influence: 34, details: {
+      role: [
+        "<b>Primary defensive actor</b>; seeks to <b>preserve the status quo</b>.",
+        "Uses <b>“principled transparency”</b> — embeds journalists to publicize Chinese aggression."
+      ],
+      motivations: [
+        "<b>Sovereign security</b> & <b>national dignity</b>.",
+        "Protect <b>resource rights under international law (UNCLOS)</b>.",
+        "Ensure <b>credibility of the U.S. alliance</b>."
+      ],
+      capabilities: [
+        "<b>Legal & diplomatic</b> leverage: <b>2016 Arbitral Award</b> invalidating China’s claims.",
+        "<b>U.S. alliance</b> as ultimate security backstop.",
+        "<b>Limitation</b>: material inferiority of <b>navy & coast guard</b>."
+      ],
+      impact: [
+        "<b>Escalatory feedback loop</b>: transparency → public pressure → PRC doubles down."
+      ]
+  }},
+  { id: "China", group: "disputant", influence: 42, details: {
+      role: [
+        "<b>Coercive, revisionist actor</b> aiming to <b>alter the status quo</b> by forcing the Philippines out.",
+        "Employs <b>“gray‑zone” tactics</b> (below the threshold of war)."
+      ],
+      motivations: [
+        "<b>Homeland security</b>: create a <b>strategic buffer</b> in the South China Sea.",
+        "<b>Regime legitimacy</b> tied to <b>“national rejuvenation”</b> narrative."
+      ],
+      capabilities: [
+        "<b>Overwhelming capacities</b>: <b>naval superiority</b>; <b>economic leverage</b> (PH’s largest trading partner); <b>diplomatic influence</b> over some ASEAN states.",
+        "<b>Limitation</b>: risk that miscalculation triggers a <b>U.S. military response</b>."
+      ],
+      impact: [
+        "Systematically <b>raises risk of wider conflict</b>.",
+        "Directly challenges the <b>rules‑based maritime order</b>."
+      ]
+  }},
+  { id: "United States", group: "third", influence: 36, details: {
+      role: [
+        "<b>Indispensable deterrent</b> and <b>alliance anchor</b>.",
+        "Formally <b>no position on sovereignty claims</b>; deters overt Chinese aggression; upholds <b>treaty commitments</b> to the Philippines."
+      ],
+      motivations: [
+        "<b>Alliance credibility</b>.",
+        "<b>Rules‑based order</b>.",
+        "<b>Freedom of navigation</b>."
+      ],
+      capabilities: [
+        "<b>Unmatched naval power</b> operationalized via <b>Mutual Defense Treaty (MDT)</b> — explicitly covers attacks on the <b>Philippine Coast Guard</b>.",
+        "<b>Expanded access</b> to Philippine bases under <b>EDCA</b>.",
+        "<b>Limits</b>: dangers of <b>entrapment</b> and continuous, sharp <b>probing of U.S. resolve</b> by competitors."
+      ],
+      impact: [
+        "Provides the <b>security backstop</b> enabling PH to resist.",
+        "Perceived by Beijing as an <b>offensive threat</b> → <b>security dilemma</b> and escalatory spiral."
+      ]
+  }},
+  { id: "Japan", group: "third", influence: 26, details: {
+      role: [
+        "<b>Supportive partner</b> (U.S. ally)."
+      ],
+      motivations: [
+        "<b>Secure sea lanes of communication (SLOCs)</b>.",
+        "Uphold a <b>rules‑based maritime order</b> vital for trade & energy flows."
+      ],
+      capabilities: [
+        "Contributes <b>advanced maritime forces</b> to <b>joint patrols & exercises</b> with PH and the U.S.",
+        "Currently negotiating a <b>Reciprocal Access Agreement (RAA)</b> with Manila."
+      ],
+      impact: [
+        "Participation builds a <b>“minilateral” security coalition</b>, signaling a <b>unified front</b> among U.S. allies.",
+        "External involvement contributes to progressively <b>higher tension & risk</b>; defensive steps read by China as <b>containment</b>."
+      ]
+  }},
+  { id: "Australia", group: "third", influence: 24, details: {
+      role: [
+        "<b>Supportive partner</b> (U.S. ally)."
+      ],
+      motivations: [
+        "<b>Secure SLOCs</b>.",
+        "Uphold a <b>rules‑based maritime order</b> essential for trade & energy flows."
+      ],
+      capabilities: [
+        "Contributes <b>advanced maritime forces</b> to <b>joint patrols & exercises</b> with PH and the U.S."
+      ],
+      impact: [
+        "Participation builds a <b>“minilateral” security coalition</b>, signaling a <b>unified front</b> among U.S. allies.",
+        "External involvement contributes to progressively <b>higher tension & risk</b>; defensive steps read by China as <b>containment</b>."
+      ]
+  }},
+  { id: "ASEAN", group: "multilateral", influence: 30, details: {
+      role: [
+        "<b>Neutral mediator</b>; principle of <b>“ASEAN Centrality”</b> places it at the heart of regional security architecture."
+      ],
+      motivations: [
+        "<b>Regional stability</b> to sustain <b>economic growth & prosperity</b> of export‑oriented members.",
+        "Preserve <b>institutional relevance & centrality</b>."
+      ],
+      capabilities: [
+        "Sole capability: <b>convening power</b> — <b>ARF</b>, <b>EAS</b>, <b>ADMM‑Plus</b> where all key stakeholders, incl. U.S. & China, engage.",
+        "<b>Severe limitations</b>: <b>consensus principle</b> (single‑member veto) and <b>no enforcement mechanisms</b> — statements often aspirational."
+      ],
+      impact: [
+        "<b>“Centrality Paradox”</b>: structurally incapable of meeting PH’s <b>hard‑power coercion</b> challenge.",
+        "PH turns to <b>external partners</b> for security; <b>erosion of ASEAN Centrality</b> follows from practical ineffectiveness, not rejection."
+      ],
+      gap: [
+        "<b>Capacity mismatch</b>: conflict needs <b>hard power, hard law, security coordination</b>; ASEAN has <b>soft power & consensus</b>.",
+        "Evidence: <b>institutional paralysis</b> in crises; members <b>bypass ASEAN</b>; diplomatic tools fail to constrain behavior; <b>external actors fill the vacuum</b>; <b>trade‑security paradox</b> — economic leverage meaningless vs core security interests.",
+        "Result: members pursue <b>“ASEAN‑plus” arrangements</b> where external partners provide real security."
+      ]
+  }}
+];
+
+// ==== Links (per your rules) ====
+const links = [
+  { source: "Philippines", target: "China", type: "tense" },
+  { source: "China", target: "United States", type: "tense" },
+  { source: "United States", target: "Philippines", type: "ally" },
+  { source: "Japan", target: "Philippines", type: "ally" },
+  { source: "Australia", target: "Philippines", type: "ally" },
+  { source: "ASEAN", target: "Philippines", type: "neutral" },
+  { source: "ASEAN", target: "China", type: "neutral" }
+];
+
+const svg = d3.select("#viz");
+const width = 1280, height = 720;
+
+// Arrowheads
+svg.append("defs").selectAll("marker")
+  .data([
+    {id:"arrow-red", color:"var(--red)"},
+    {id:"arrow-blue", color:"var(--blue)"},
+    {id:"arrow-grey", color:"var(--grey)"}
+  ])
+  .enter().append("marker")
+  .attr("id", d => d.id)
+  .attr("viewBox", "0 -5 10 10")
+  .attr("refX", 18).attr("refY", 0)
+  .attr("markerWidth", 7).attr("markerHeight", 7)
+  .attr("orient", "auto")
+  .append("path").attr("d", "M0,-5L10,0L0,5")
+  .attr("fill", d => getColorFromId(d.id));
+
+function getColorFromId(id){ if(id.includes("red")) return getStroke("tense"); if(id.includes("blue")) return getStroke("ally"); return getStroke("neutral"); }
+function nodeColor(d){ const r=getComputedStyle(document.documentElement); if(d.group==="disputant")return r.getPropertyValue('--red'); if(d.group==="third")return r.getPropertyValue('--blue'); return r.getPropertyValue('--green'); }
+function nodeGlowClass(d){ if(d.group==="disputant")return "glow-red"; if(d.group==="third")return "glow-blue"; return "glow-green"; }
+function getStroke(type){ const r=getComputedStyle(document.documentElement); if(type==="tense")return r.getPropertyValue('--red'); if(type==="ally")return r.getPropertyValue('--blue'); return r.getPropertyValue('--grey'); }
+
+const link = svg.append("g").attr("stroke-linecap","round").selectAll("path")
+  .data(links).enter().append("path")
+  .attr("fill","none")
+  .attr("stroke", d => getStroke(d.type))
+  .attr("stroke-opacity", 0.95)
+  .attr("stroke-width", d => d.type==="tense"?3.6:(d.type==="ally"?3.2:2.8))
+  .attr("marker-end", d => d.type==="tense"?"url(#arrow-red)":d.type==="ally"?"url(#arrow-blue)":"url(#arrow-grey)");
+
+// Nodes (flag cards)
+const node = svg.append("g").selectAll("g").data(nodes).enter().append("g")
+  .attr("class", d => `node ${nodeGlowClass(d)}`)
+  .call(drag());
+
+node.append("rect")
+  .attr("class", "flagCard")
+  .attr("x", d => -d.influence * 1.25)
+  .attr("y", d => -d.influence * 0.95)
+  .attr("width", d => d.influence * 2.5)
+  .attr("height", d => d.influence * 1.9)
+  .attr("fill", "rgba(255,255,255,0.06)");
+
+// Inline SVG flags
+node.each(function(d){
+  const g = d3.select(this);
+  const w = d.influence * 2.2, h = d.influence * 1.3;
+  const x = -w/2, y = -h/2;
+
+  function star(cx, cy, r, fill, points=5, rotateDeg=0){
+    const path = [];
+    const inner = r*0.5;
+    for(let i=0;i<points*2;i++){
+      const ang = (Math.PI/(points))*i + (rotateDeg*Math.PI/180);
+      const rad = i%2===0 ? r : inner;
+      path.push([cx + Math.cos(ang- Math.PI/2)*rad, cy + Math.sin(ang- Math.PI/2)*rad]);
+    }
+    g.append("path").attr("d", "M"+path.map(p=>p.join(",")).join("L")+"Z").attr("fill", fill);
+  }
+
+  function flagUS(){
+    const stripes = 13;
+    for(let i=0;i<stripes;i++){
+      g.append("rect").attr("x", x).attr("y", y + i*(h/stripes)).attr("width", w).attr("height", h/stripes)
+        .attr("fill", i%2===0 ? "#b22234" : "#ffffff");
+    }
+    const cw = w*0.4, ch = h*0.54;
+    g.append("rect").attr("x", x).attr("y", y).attr("width", cw).attr("height", ch).attr("fill", "#3c3b6e");
+    for(let r=0;r<5;r++){
+      for(let c=0;c<6;c++){
+        g.append("circle").attr("cx", x+cw*(0.08 + c*0.15 + (r%2?0.075:0)))
+          .attr("cy", y+ch*(0.12 + r*0.18)).attr("r", 0.9).attr("fill", "#ffffff");
+      }
+    }
+  }
+  function flagChina(){
+    g.append("rect").attr("x", x).attr("y", y).attr("width", w).attr("height", h).attr("fill", "#de2910");
+    const bx = x + w*0.18, by = y + h*0.28, R= h*0.12;
+    star(bx, by, R, "#ffde00", 5);
+    const coords = [[w*0.32,h*0.16,20],[w*0.40,h*0.26,5],[w*0.40,h*0.40,0],[w*0.32,h*0.50,-20]];
+    coords.forEach(([dx,dy,rot]) => star(x+dx, y+dy, h*0.05, "#ffde00", 5, rot));
+  }
+  function flagPhilippines(){
+    g.append("rect").attr("x", x).attr("y", y).attr("width", w).attr("height", h/2).attr("fill", "#0038a8");
+    g.append("rect").attr("x", x).attr("y", y+h/2).attr("width", w).attr("height", h/2).attr("fill", "#ce1126");
+    const tri = `M ${x} ${y} L ${x} ${y+h} L ${x+w*0.45} ${y+h/2} Z`;
+    g.append("path").attr("d", tri).attr("fill", "#ffffff");
+    const cx = x + w*0.18, cy = y + h*0.5;
+    g.append("circle").attr("cx", cx).attr("cy", cy).attr("r", h*0.08).attr("fill", "#fcd116");
+    for(let i=0;i<8;i++){
+      const angle = i*Math.PI/4;
+      const x1 = cx + Math.cos(angle)*h*0.12, y1 = cy + Math.sin(angle)*h*0.12;
+      g.append("line").attr("x1", cx).attr("y1", cy).attr("x2", x1).attr("y2", y1).attr("stroke", "#fcd116").attr("stroke-width", 2);
+    }
+    const stars = [[x+w*0.06,y+h*0.08],[x+w*0.25,y+h*0.5],[x+w*0.06,y+h*0.92]];
+    stars.forEach(([sx,sy]) => star(sx, sy, h*0.035, "#fcd116", 5));
+  }
+  function flagJapan(){
+    g.append("rect").attr("x", x).attr("y", y).attr("width", w).attr("height", h).attr("fill", "#ffffff");
+    g.append("circle").attr("cx", 0).attr("cy", 0).attr("r", h*0.3).attr("fill", "#bc002d");
+  }
+  function flagAustralia(){
+    g.append("rect").attr("x", x).attr("y", y).attr("width", w).attr("height", h).attr("fill", "#00247d");
+    const cw = w*0.4, ch = h*0.5;
+    g.append("rect").attr("x", x).attr("y", y).attr("width", cw).attr("height", ch).attr("fill", "#012169");
+    g.append("rect").attr("x", x).attr("y", y+ch*0.42).attr("width", cw).attr("height", ch*0.16).attr("fill", "#ffffff");
+    g.append("rect").attr("x", x+cw*0.42).attr("y", y).attr("width", cw*0.16).attr("height", ch).attr("fill", "#ffffff");
+    g.append("rect").attr("x", x).attr("y", y+ch*0.46).attr("width", cw).attr("height", ch*0.08).attr("fill", "#c8102e");
+    g.append("rect").attr("x", x+cw*0.46).attr("y", y).attr("width", cw*0.08).attr("height", ch).attr("fill", "#c8102e");
+    star(x+w*0.33, y+ch+ h*0.08, h*0.07, "#ffffff", 7);
+    const sc = [[w*0.68,-h*0.10],[w*0.78,0],[w*0.70,h*0.14],[w*0.86,-h*0.02],[w*0.86,h*0.18]];
+    sc.forEach(([dx,dy]) => star(x+dx, y+ch+dy, h*0.05, "#ffffff", 7));
+  }
+  function flagASEAN(){
+    const bw = w*0.95, bh = h*0.95, bx = -bw/2, by = -bh/2;
+    g.append("rect").attr("x", bx).attr("y", by).attr("width", bw).attr("height", bh).attr("fill", "#1e3a8a").attr("rx", 6).attr("ry", 6);
+    g.append("circle").attr("cx", 0).attr("cy", 0).attr("r", Math.min(bw,bh)*0.42).attr("fill","none").attr("stroke","#ff3b30").attr("stroke-width",4);
+    const stalkH = Math.min(bw,bh)*0.5, stalkW = Math.min(bw,bh)*0.06;
+    for(let i=-2;i<=2;i++){
+      g.append("rect").attr("x", i*stalkW*1.25 - stalkW/2).attr("y", -stalkH/2)
+        .attr("width", stalkW).attr("height", stalkH).attr("rx", 2).attr("ry", 2).attr("fill", "#ffd54f");
+    }
+  }
+
+  const name = d.id;
+  if(name==="United States") flagUS();
+  else if(name==="China") flagChina();
+  else if(name==="Philippines") flagPhilippines();
+  else if(name==="Japan") flagJapan();
+  else if(name==="Australia") flagAustralia();
+  else if(name==="ASEAN") flagASEAN();
+});
+
+// labels
+node.append("text").attr("class","label").attr("text-anchor","middle").attr("dy", d => d.influence*1.1 + 18).text(d => d.id);
+
+// Tooltip — bold section headers, bullet/keyword layout
+const tip = d3.select("#tip");
+node.on("mouseenter", (event, d) => {
+  function section(title, items){
+    const list = items.map(t => `<div class="bul">${t}</div>`).join("");
+    return `<div><b>${title}:</b>${list}</div>`;
+  }
+  const parts = [
+    section("Role & Stance", d.details.role),
+    section("Motivations", d.details.motivations),
+    section("Capabilities & Limitations", d.details.capabilities),
+    section("Impact on Conflict", d.details.impact),
+  ];
+  // ASEAN has the additional capacity-gap summary from the script
+  if(d.id === "ASEAN" && d.details.gap){
+    parts.push(section("ASEAN's Capacity Gap", d.details.gap));
+  }
+  const html = `<h4>${d.id}</h4><div class="meta">${parts.join("")}</div>`;
+  tip.html(html).style("display","block");
+});
+node.on("mousemove", (event) => { tip.style("left", (event.clientX+22)+"px").style("top", (event.clientY+22)+"px"); });
+node.on("mouseleave", () => tip.style("display","none"));
+
+// Force simulation
+const sim = d3.forceSimulation(nodes)
+  .force("link", d3.forceLink(links).id(d=>d.id).distance(d => d.type==="tense"?190:d.type==="ally"?220:260).strength(0.09))
+  .force("charge", d3.forceManyBody().strength(-700))
+  .force("center", d3.forceCenter(width/2, height/2))
+  .force("collision", d3.forceCollide().radius(d => d.influence + 34))
+  .on("tick", ticked);
+
+const startPos = {
+  "China": [770, 330],
+  "Philippines": [520, 360],
+  "United States": [320, 220],
+  "Japan": [700, 160],
+  "Australia": [700, 560],
+  "ASEAN": [980, 360]
+};
+nodes.forEach(n => { if(startPos[n.id]){ n.x=startPos[n.id][0]; n.y=startPos[n.id][1]; }});
+
+function curvedLine(d){
+  const dx = d.target.x - d.source.x, dy = d.target.y - d.source.y;
+  const dr = Math.hypot(dx, dy) * 0.65, sweep = 1;
+  return `M${d.source.x},${d.source.y} A${dr},${dr} 0 0,${sweep} ${d.target.x},${d.target.y}`;
+}
+function ticked(){ link.attr("d", curvedLine); node.attr("transform", d => `translate(${d.x},${d.y})`); }
+
+function drag(){
+  function dragstarted(event,d){ if(!event.active) sim.alphaTarget(0.2).restart(); d.fx=d.x; d.fy=d.y; }
+  function dragged(event,d){ d.fx=event.x; d.fy=event.y; }
+  function dragended(event,d){ if(!event.active) sim.alphaTarget(0); d.fx=null; d.fy=null; }
+  return d3.drag().on("start", dragstarted).on("drag", dragged).on("end", dragended);
+}
+</script>
+</body>
+</html>
